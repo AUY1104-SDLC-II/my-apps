@@ -1,0 +1,12 @@
+name: Client API Deployment
+
+on:
+  push:
+    branches:
+      - main
+jobs:
+  deploy-to-hub:
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@main
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

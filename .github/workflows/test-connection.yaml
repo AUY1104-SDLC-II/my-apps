@@ -1,0 +1,11 @@
+name: Client Test Execution
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  execute-hello:
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/helloworld.yaml@main
