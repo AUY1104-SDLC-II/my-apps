@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
 jobs:
   deploy-to-hub:
     uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@main
