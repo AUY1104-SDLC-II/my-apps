@@ -3,9 +3,15 @@ name: Client Test Execution
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - feature/*
+    tags-ignore:
+      - "**"
 
 jobs:
-  execute-hello:
-    uses: AUY1104-SDLC-II/devops-library/.github/workflows/helloworld.yaml@main
+  validate-and-build:
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@feat/logic-validation
+    with:
+      image_name: "auy1104-app"
+      image_tag: ${{ github.ref_name }}
+      push_image: false
+    secrets: inherit
