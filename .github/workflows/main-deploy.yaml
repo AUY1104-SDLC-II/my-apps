@@ -2,13 +2,13 @@ name: Client API Deployment
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
-
+    tags:
+      - 'v*.*.*'
 jobs:
   deploy-to-hub:
-    uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@main
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@feat/logic-validation
+    with:
+      image_name: "auy1104-app"
+      image_tag: ${{ github.ref_name }}
+      push_image: true
+    secrets: inherit
