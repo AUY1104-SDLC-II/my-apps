@@ -6,8 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
-    "test": "jest --coverage --passWithNoTests",
-
+    "test": "node test.js --coverage"
   },
   "engines": {
     "node": ">=20"
