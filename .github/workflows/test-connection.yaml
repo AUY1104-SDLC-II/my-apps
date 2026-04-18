@@ -12,6 +12,6 @@ jobs:
     uses: AUY1104-SDLC-II/devops-library/.github/workflows/deploy-api.yaml@feat/logic-validation
     with:
       image_name: "auy1104-app"
-      image_tag: ${{ github.ref_name }}
+      image_tag: ${{ github.sha }}
       push_image: false
     secrets: inherit
