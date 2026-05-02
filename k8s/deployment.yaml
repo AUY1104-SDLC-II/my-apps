@@ -1,0 +1,42 @@
+# Misma convención que client.yaml → image-name: auy1104-app
+# Sustituir YOUR_DOCKERHUB_USERNAME por tu usuario (igual que secret DOCKER_USERNAME).
+# La receta deploy-api publica: <usuario>/auy1104-app:<tag> y :latest
+#
+# Borde HTTP: no duplicar HAProxy aquí. Aplicar primero en el cluster
+# AUY1104-SharedWorkflows k8s-manifests/haproxy-academic/shared/
+# (ea2-haproxy-academic). Ruta pública :30088 …/backend/* → este Service auy1104-app:3000.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auy1104-app
+  labels:
+    app: auy1104-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auy1104-app
+  template:
+    metadata:
+      labels:
+        app: auy1104-app
+    spec:
+      containers:
+        - name: api
+          image: mafernandezz/auy1104-app:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
