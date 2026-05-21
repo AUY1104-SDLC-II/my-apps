@@ -7,14 +7,14 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: auy1104-app
+      app: my-app
   template:
     metadata:
       labels:
-        app: auy1104-app
+        app: my-app
     spec:
       containers:
-        - name: auy1104-app
+        - name: my-app
           image: DOCKER_USERNAME_PLACEHOLDER/auy1104-app:latest
           ports:
             - containerPort: 3000
@@ -30,7 +30,7 @@ metadata:
 spec:
   type: NodePort
   selector:
-    app: auy1104-app
+    app: my-app
   ports:
     - port: 3000
       targetPort: 3000
