@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: my-app
-          image: mfernandezz/my-apps:latest
+          image: mafernandezz/my-apps:latest
           ports:
             - containerPort: 3000
           env:
