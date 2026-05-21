@@ -1,14 +1,6 @@
 name: "EV2 — Build & Deploy App Principal"
 
 on:
-  push:
-    branches:
-      - feat/ev2-app-deploy
-    paths:
-      - 'src/**'
-      - 'k8s/**'
-      - 'Dockerfile'
-      - '.github/workflows/ev2-deploy-app.yaml'
   workflow_dispatch:
 
 permissions:
@@ -64,7 +56,10 @@ jobs:
           scp -o StrictHostKeyChecking=accept-new \
             k8s/app-stack.yaml ubuntu@${SERVER_IP}:/tmp/app-stack.yaml
           ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} \
-            "sudo k3s kubectl apply -f /tmp/app-stack.yaml && \
+            "sudo k3s kubectl delete deployment my-app-deployment -n default --ignore-not-found && \
+             sudo k3s kubectl delete service my-app-service -n default --ignore-not-found && \
+             sleep 5 && \
+             sudo k3s kubectl apply -f /tmp/app-stack.yaml && \
              sudo k3s kubectl rollout status deployment/my-app-deployment --timeout=180s"
 
       - name: Verify /health endpoint
