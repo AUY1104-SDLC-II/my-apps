@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auy1104-app-deployment
+  name: my-app-deployment
   namespace: default
 spec:
   replicas: 1
@@ -25,7 +25,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: auy1104-app-service
+  name: my-app-service
   namespace: default
 spec:
   type: NodePort
