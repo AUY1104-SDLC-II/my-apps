@@ -1,0 +1,249 @@
+# ─────────────────────────────────────────────────────────────
+# EA2 · Laboratorio K8s en EC2 (Terraform + SSH)
+# Rama sugerida: EA2 (no mergear a main hasta liberar a alumnos)
+#
+# - workflow_call: lo invoca el repo del alumno con sus secretos AWS + SSH.
+# - workflow_dispatch: prueba desde este mismo repo (Actions → Run workflow).
+#
+# Contexto académico: sandbox ~3 h, state desechable, reglas de red amplias.
+# ─────────────────────────────────────────────────────────────
+
+name: EA2 — Provisionar MV + K8s (receta reutilizable)
+
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        description: Región AWS
+        required: false
+        type: string
+        default: us-east-1
+      instance_type:
+        description: Tipo EC2 (ej. t3.small)
+        required: false
+        type: string
+        default: t3.small
+      ssh_cidr_ipv4:
+        description: CIDR origen SSH (0.0.0.0/0 = laboratorio abierto)
+        required: false
+        type: string
+        default: 0.0.0.0/0
+      k8s_api_cidr_ipv4:
+        description: CIDR origen hacia API K3s/kubectl (6443). Debe incluir tu IP si usas kubectl desde tu PC sin tunel SSH.
+        required: false
+        type: string
+        default: 0.0.0.0/0
+      k8s_stack:
+        description: Qué instalar vía SSH tras crear la MV
+        required: false
+        type: string
+        default: k3s
+      provision_dockerhub:
+        description: Si true y hay DOCKER_* en secretos, crea imagePullSecret en default; si false, lo omiten (práctica manual en clase)
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_SESSION_TOKEN:
+        required: false
+      EA2_SSH_PRIVATE_KEY:
+        description: Clave privada PEM (OpenSSH) emparejada con la pública en la instancia
+        required: true
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: Región AWS
+        required: true
+        type: string
+        default: us-east-1
+      instance_type:
+        description: Tipo EC2
+        required: true
+        type: string
+        default: t3.small
+      ssh_cidr_ipv4:
+        description: CIDR origen SSH
+        required: true
+        type: string
+        default: 0.0.0.0/0
+      k8s_api_cidr_ipv4:
+        description: CIDR origen API K3s (6443); kubectl desde fuera necesita llegar aqui o usar tunel SSH.
+        required: true
+        type: string
+        default: 0.0.0.0/0
+      k8s_stack:
+        description: k3s (rápido) · minikube (más lento) · none (solo EC2)
+        required: true
+        type: choice
+        options:
+          - k3s
+          - minikube
+          - none
+        default: k3s
+      provision_dockerhub:
+        description: ¿Provisionar credenciales Docker Hub en el cluster? (desmarcar si en clase lo hacen a mano)
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  provision:
+    name: Terraform EC2 + instalación remota
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      TF_IN_AUTOMATION: true
+
+    steps:
+      - name: Descargar este repositorio (incluye infra Terraform)
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Derivar clave pública desde la privada (solo en el runner; no se guarda)
+        env:
+          PEM: ${{ secrets.EA2_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PEM" > ~/.ssh/ea2_lab.pem
+          chmod 600 ~/.ssh/ea2_lab.pem
+          ssh-keygen -y -f ~/.ssh/ea2_lab.pem > ~/.ssh/ea2_lab.pub
+          # Una línea; seguro para GITHUB_ENV
+          echo "TF_VAR_public_key=$(cat ~/.ssh/ea2_lab.pub)" >> "$GITHUB_ENV"
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Terraform init
+        working-directory: infra/ea2-sandbox-vm
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: infra/ea2-sandbox-vm
+        env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
+          TF_VAR_instance_type: ${{ inputs.instance_type }}
+          TF_VAR_ssh_cidr_ipv4: ${{ inputs.ssh_cidr_ipv4 }}
+          TF_VAR_k8s_api_cidr_ipv4: ${{ inputs.k8s_api_cidr_ipv4 }}
+        run: terraform apply -auto-approve
+
+      - name: Capturar salidas Terraform (IP + usuario SSH)
+        id: out
+        working-directory: infra/ea2-sandbox-vm
+        run: |
+          echo "public_ip=$(terraform output -raw public_ip)" >> "$GITHUB_OUTPUT"
+          echo "ssh_user=$(terraform output -raw ssh_user)" >> "$GITHUB_OUTPUT"
+
+      - name: Esperar SSH (cloud-init)
+        env:
+          PUBLIC_IP: ${{ steps.out.outputs.public_ip }}
+          SSH_USER: ${{ steps.out.outputs.ssh_user }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                -o ConnectTimeout=10 -o BatchMode=yes \
+                -i ~/.ssh/ea2_lab.pem "${SSH_USER}@${PUBLIC_IP}" 'echo ssh-ok'; then
+              exit 0
+            fi
+            echo "intento $i/40 — esperando SSH..."
+            sleep 15
+          done
+          echo "SSH no respondió a tiempo"
+          exit 1
+
+      - name: Instalar stack Kubernetes vía SSH
+        if: ${{ inputs.k8s_stack != 'none' }}
+        env:
+          PUBLIC_IP: ${{ steps.out.outputs.public_ip }}
+          SSH_USER: ${{ steps.out.outputs.ssh_user }}
+          STACK: ${{ inputs.k8s_stack }}
+          PROVISION_DOCKERHUB: ${{ inputs.provision_dockerhub }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          REMOTE='ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/ea2_lab.pem '"${SSH_USER}"'@'"$PUBLIC_IP"
+
+          if [ "$STACK" = "k3s" ]; then
+            # --tls-san IP publica: si no, kubectl desde fuera falla x509 (cert valid for 127.0.0.1, not EC2 elastic IP).
+            $REMOTE "curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC=\"--write-kubeconfig-mode 644 --tls-san ${PUBLIC_IP}\" sh -"
+            $REMOTE 'sudo kubectl get nodes || true'
+            KUB="sudo kubectl"
+          elif [ "$STACK" = "minikube" ]; then
+            $REMOTE 'sudo apt-get update -y && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io conntrack'
+            $REMOTE 'curl -fsSL -o /tmp/minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install /tmp/minikube /usr/local/bin/minikube && chmod +x /usr/local/bin/minikube'
+            $REMOTE 'sudo minikube start --driver=docker --force --wait=all'
+            $REMOTE 'sudo minikube kubectl -- get nodes || true'
+            KUB="sudo minikube kubectl --"
+          else
+            echo "k8s_stack desconocido: $STACK"
+            exit 1
+          fi
+
+          if [ "${PROVISION_DOCKERHUB}" != "true" ]; then
+            echo "provision_dockerhub=false — no se crean credenciales Docker Hub en el cluster (asumir práctica manual o imagen pública)."
+          elif [ -z "${DOCKER_USERNAME:-}" ] || [ -z "${DOCKER_PASSWORD:-}" ]; then
+            echo "provision_dockerhub=true pero faltan secretos DOCKER_USERNAME / DOCKER_PASSWORD; se omite."
+          else
+            UB64=$(printf '%s' "$DOCKER_USERNAME" | base64 -w0)
+            PB64=$(printf '%s' "$DOCKER_PASSWORD" | base64 -w0)
+            $REMOTE "set -e; U=\$(echo '${UB64}' | base64 -d); P=\$(echo '${PB64}' | base64 -d); ${KUB} delete secret dockerhub-cred -n default --ignore-not-found; ${KUB} create secret docker-registry dockerhub-cred --docker-server=https://index.docker.io/v1/ --docker-username=\"\$U\" --docker-password=\"\$P\" --docker-email=noreply@local -n default"
+            for attempt in $(seq 1 40); do
+              if $REMOTE "${KUB} get serviceaccount default -n default" >/dev/null 2>&1; then
+                break
+              fi
+              if [ "$attempt" -eq 40 ]; then
+                echo "Timeout: no aparece serviceaccount default en namespace default"
+                exit 1
+              fi
+              sleep 2
+            done
+            $REMOTE "${KUB} patch serviceaccount default -n default -p '{\"imagePullSecrets\":[{\"name\":\"dockerhub-cred\"}]}'"
+          fi
+
+      - name: Resumen (IP + hints)
+        env:
+          PUBLIC_IP: ${{ steps.out.outputs.public_ip }}
+          SSH_USER: ${{ steps.out.outputs.ssh_user }}
+          STACK: ${{ inputs.k8s_stack }}
+        run: |
+          {
+            echo "### EA2 — MV lista"
+            echo ""
+            echo "**IP pública:** \`$PUBLIC_IP\`"
+            echo ""
+            echo "**SSH:** \`ssh -i <tu-clave.pem> ${SSH_USER}@$PUBLIC_IP\`"
+            echo ""
+            echo "**Stack:** \`$STACK\`"
+            echo ""
+            if [ "$STACK" = "k3s" ]; then
+              echo "Kubeconfig en el servidor: \`/etc/rancher/k3s/k3s.yaml\` (sustituir 127.0.0.1 por la IP pública si lo copias a tu máquina)."
+              echo "K3s se instalo con \`--tls-san ${PUBLIC_IP}\` para que el certificado TLS acepte kubectl contra https://${PUBLIC_IP}:6443."
+            elif [ "$STACK" = "minikube" ]; then
+              echo "En el servidor: \`sudo minikube kubectl --\` o \`sudo cat ~/.kube/config\` según perfil de minikube."
+            fi
+            echo ""
+            echo "_Sandbox académico: el entorno se destruye solo; state de Terraform solo vivió en este runner._"
+          } >> "$GITHUB_STEP_SUMMARY"
