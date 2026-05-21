@@ -26,8 +26,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/my-apps:latest
-            ${{ secrets.DOCKER_USERNAME }}/my-apps:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/auy1104-app:latest
+            ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
 
   deploy:
     name: "Deploy to k3s — puerto 30090"

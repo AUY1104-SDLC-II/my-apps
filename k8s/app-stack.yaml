@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-app-deployment
+  name: auy1104-app-deployment
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: my-app
+      app: auy1104-app
   template:
     metadata:
       labels:
-        app: my-app
+        app: auy1104-app
     spec:
       containers:
-        - name: my-app
-          image: DOCKER_USERNAME_PLACEHOLDER/my-apps:latest
+        - name: auy1104-app
+          image: DOCKER_USERNAME_PLACEHOLDER/auy1104-app:latest
           ports:
             - containerPort: 3000
           env:
@@ -25,12 +25,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: my-app-service
+  name: auy1104-app-service
   namespace: default
 spec:
   type: NodePort
   selector:
-    app: my-app
+    app: auy1104-app
   ports:
     - port: 3000
       targetPort: 3000
