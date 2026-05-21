@@ -51,10 +51,17 @@ jobs:
           fi
           echo "SERVER_IP=$FINAL_IP" >> $GITHUB_ENV
 
+      - name: Render K8s Manifest
+        run: |
+          sed "s|DOCKER_USERNAME_PLACEHOLDER|${{ secrets.DOCKER_USERNAME }}|g" \
+            k8s/app-stack.yaml > /tmp/app-stack-rendered.yaml
+          echo "✅ Imagen a desplegar:"
+          grep "image:" /tmp/app-stack-rendered.yaml
+
       - name: Apply K8s Manifests
         run: |
           scp -o StrictHostKeyChecking=accept-new \
-            k8s/app-stack.yaml ubuntu@${SERVER_IP}:/tmp/app-stack.yaml
+            /tmp/app-stack-rendered.yaml ubuntu@${SERVER_IP}:/tmp/app-stack.yaml
           ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} \
             "sudo k3s kubectl delete deployment my-app-deployment -n default --ignore-not-found && \
              sudo k3s kubectl delete service my-app-service -n default --ignore-not-found && \

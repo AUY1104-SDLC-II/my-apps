@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: my-app
-          image: mafernandezz/my-apps:latest
+          image: DOCKER_USERNAME_PLACEHOLDER/my-apps:latest
           ports:
             - containerPort: 3000
           env:
