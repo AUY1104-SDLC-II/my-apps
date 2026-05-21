@@ -1,0 +1,80 @@
+name: "EV2 — Build & Deploy App Principal"
+
+on:
+  push:
+    branches:
+      - feat/ev2-app-deploy
+    paths:
+      - 'src/**'
+      - 'k8s/**'
+      - 'Dockerfile'
+      - '.github/workflows/ev2-deploy-app.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: "Build & Push Docker Image"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/my-apps:latest
+            ${{ secrets.DOCKER_USERNAME }}/my-apps:${{ github.sha }}
+
+  deploy:
+    name: "Deploy to k3s — puerto 30090"
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EA2_SSH_PRIVATE_KEY }}
+
+      - name: Set Server IP
+        run: |
+          FINAL_IP="${{ vars.K3S_SERVER_PUBLIC_IP }}"
+          if [ -z "$FINAL_IP" ]; then
+            echo "❌ ERROR: Configura la variable K3S_SERVER_PUBLIC_IP en Settings del repo"
+            exit 1
+          fi
+          echo "SERVER_IP=$FINAL_IP" >> $GITHUB_ENV
+
+      - name: Apply K8s Manifests
+        run: |
+          scp -o StrictHostKeyChecking=accept-new \
+            k8s/app-stack.yaml ubuntu@${SERVER_IP}:/tmp/app-stack.yaml
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} \
+            "sudo k3s kubectl apply -f /tmp/app-stack.yaml && \
+             sudo k3s kubectl rollout status deployment/my-app-deployment --timeout=180s"
+
+      - name: Verify /health endpoint
+        run: |
+          sleep 15
+          curl -f http://${SERVER_IP}:30090/health
+
+      - name: Rollback on Failure
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} \
+            'sudo k3s kubectl rollout undo deployment/my-app-deployment || true'
+          exit 1
