@@ -8,9 +8,9 @@ describe('API HTTP (GET y POST)', () => {
     app = createApp();
   });
   // Test intencional para verificar que el testeo funciona correctamente
-  it('test forzado para evidenciar fallo antes de Docker', () => {
-    expect(1).toBe(2);
-  });
+//  it('test forzado para evidenciar fallo antes de Docker', () => {
+//    expect(1).toBe(2);
+//  });
   describe('GET /health', () => {
     it('responde 200 y JSON con ok', async () => {
       const res = await request(app).get('/health');

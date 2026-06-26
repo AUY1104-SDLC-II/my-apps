@@ -1,17 +1,14 @@
 apiVersion: v1
-kind: Pod
+kind: Service
 metadata:
-  name: $title$
-  labels:
-    role: $title$
+  name: demo-api-bg-svc
+  namespace: lab32
 spec:
-  containers:
-    - name: $title$
-      image: $nginx$
-      imagePullPolicy: IfNotPresent
-      ports:
-        - name: $title$
-          containerPort: $80$
-          protocol: $TCP$
-  restartPolicy: Always
-  $END$
+  type: NodePort
+  selector:
+    app: demo-api
+    slot: blue         # ← apunta a Blue inicialmente
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30081

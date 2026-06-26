@@ -1,17 +1,36 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: $title$
+  name: demo-api
+  namespace: lab32
   labels:
-    role: $title$
+    app: demo-api
 spec:
-  containers:
-    - name: $title$
-      image: $nginx$
-      imagePullPolicy: IfNotPresent
-      ports:
-        - name: $title$
-          containerPort: $80$
-          protocol: $TCP$
-  restartPolicy: Always
-  $END$
+  replicas: 3
+  selector:
+    matchLabels:
+      app: demo-api
+  template:
+    metadata:
+      labels:
+        app: demo-api
+        version: v1
+    spec:
+      containers:
+        - name: api
+          image: asanchezoduoc/demo-api:latest   # imagen estable
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
