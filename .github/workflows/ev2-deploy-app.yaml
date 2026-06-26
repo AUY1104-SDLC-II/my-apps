@@ -57,28 +57,29 @@ jobs:
           scp -o StrictHostKeyChecking=accept-new \
             /tmp/app-stack-rendered.yaml ubuntu@${SERVER_IP}:/tmp/app-stack.yaml
 
-#      - name: Deploy to k3s
-#        id: deploy
-#        run: |
-#          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
-#          set -e
-#          sudo k3s kubectl apply -f /tmp/app-stack.yaml -n default
-#          sudo k3s kubectl rollout status deployment/my-app-deployment \
-#            -n default --timeout=60s
-#          EOF
       - name: Deploy to k3s
         id: deploy
         run: |
           ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
           set -e
-          echo "Forzando imagen inexistente para probar rollback automático..."
-          sudo k3s kubectl set image deployment/my-app-deployment \
-            my-app=${{ secrets.DOCKER_USERNAME }}/auy1104-app:tag-no-existe-v999 \
-            -n default
-
+          sudo k3s kubectl apply -f /tmp/app-stack.yaml -n default
           sudo k3s kubectl rollout status deployment/my-app-deployment \
             -n default --timeout=60s
           EOF
+
+#      - name: Deploy to k3s
+#        id: deploy
+#        run: |
+#          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
+#          set -e
+#          echo "Forzando imagen inexistente para probar rollback automático..."
+#          sudo k3s kubectl set image deployment/my-app-deployment \
+#            my-app=${{ secrets.DOCKER_USERNAME }}/auy1104-app:tag-no-existe-v999 \
+#            -n default
+#
+#          sudo k3s kubectl rollout status deployment/my-app-deployment \
+#            -n default --timeout=60s
+#          EOF
 
       - name: Rollback automático
         if: failure()
