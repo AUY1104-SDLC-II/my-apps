@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: orders-api
-          image: DOCKER_USERNAME_PLACEHOLDER/auy1104-app:latest
+          image: mafernandezz/auy1104-app:latest
           ports:
             - containerPort: 3000
           env:
