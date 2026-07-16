@@ -30,8 +30,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/auy1104-app:latest
-            ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/demo-api:latest
+            ${{ secrets.DOCKER_USERNAME }}/demo-api:${{ github.sha }}
 
   deploy-canary:
     needs: build-and-push
