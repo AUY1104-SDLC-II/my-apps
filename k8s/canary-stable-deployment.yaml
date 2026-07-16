@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api-stable
+  namespace: canary-orders
+  labels:
+    app: orders-api
+    environment: dev
+    strategy: canary
+    track: stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orders-api
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: orders-api
+        environment: dev
+        strategy: canary
+        track: stable
+    spec:
+      containers:
+        - name: orders-api
+          image: DOCKER_USERNAME_PLACEHOLDER/auy1104-app:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3

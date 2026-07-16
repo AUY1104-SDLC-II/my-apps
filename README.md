@@ -106,3 +106,8 @@ Docker de Ejemplo/
 | Variable | Valor por defecto | Uso |
 |----------|-------------------|-----|
 | `PORT` | `3000` | Puerto donde escucha la app dentro del contenedor o en local |
+
+
+Busqueda de info
+
+Labels: https://kubernetes.io/es/docs/concepts/overview/working-with-objects/labels/
