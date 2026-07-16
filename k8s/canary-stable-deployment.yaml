@@ -24,7 +24,8 @@ spec:
     spec:
       containers:
         - name: orders-api
-          image: asanchezoduoc/demo-api:latest
+          image: mafernandezz/auy1104-app:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           env:
