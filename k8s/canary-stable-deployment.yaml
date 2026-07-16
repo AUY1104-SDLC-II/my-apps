@@ -24,24 +24,21 @@ spec:
     spec:
       containers:
         - name: orders-api
-          image: mafernandezz/auy1104-app:latest
+          image: nginx:stable
           imagePullPolicy: Always
           ports:
-            - containerPort: 3000
-          env:
-            - name: PORT
-              value: "3000"
+            - containerPort: 80
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 3

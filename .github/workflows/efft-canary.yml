@@ -75,4 +75,4 @@ jobs:
       - name: Verify /health endpoint
         run: |
           sleep 10
-          curl -f http://${SERVER_IP}:30080
+          curl -f http://${SERVER_IP}:30080/
