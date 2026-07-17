@@ -21,4 +21,5 @@ jobs:
     with:
       stable_image: mafernandezz/auy1104-app@sha256:8cf9ad3c7a1ae510034a85eaa00107edf167ac785e29165e8f5985581c5c59b4
       server_ip: ${{ vars.K3S_SERVER_PUBLIC_IP }}
+      imagen_name: auy1104-app
     secrets: inherit
