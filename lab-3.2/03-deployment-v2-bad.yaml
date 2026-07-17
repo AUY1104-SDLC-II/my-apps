@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-api
+  namespace: lab32
+  labels:
+    app: demo-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: demo-api
+  template:
+    metadata:
+      labels:
+        app: demo-api
+        version: v2-bad
+    spec:
+      containers:
+        - name: api
+          image: asanchezoduoc/demo-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ruta-que-no-existe   # ← forzamos fallo de liveness
+              port: 3000
+            initialDelaySeconds: 15       # arranca OK
+            periodSeconds: 10
+            failureThreshold: 2           # falla rápido

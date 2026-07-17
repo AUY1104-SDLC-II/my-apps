@@ -1,0 +1,32 @@
+# Primero escala V1 a 9 réplicas:
+# kubectl scale deployment/demo-api --replicas=9 -n lab32
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-api-canary
+  namespace: lab32
+spec:
+  replicas: 1            # 10% del tráfico (~1 de 10 pods)
+  selector:
+    matchLabels:
+      app: demo-api      # mismo selector que el Service principal
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: demo-api
+        track: canary
+    spec:
+      containers:
+        - name: api
+          image: asanchezoduoc/demo-api:latest
+          ports:
+            - containerPort: 3000
+          livenessProbe:
+            httpGet:
+              path: /ruta-que-no-existe
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 2

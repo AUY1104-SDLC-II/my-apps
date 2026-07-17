@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: canary-orders
+  labels:
+    project: techmarket
+    environment: dev
+    strategy: canary

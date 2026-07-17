@@ -1,0 +1,144 @@
+name: EFT - Deploy estrategia Canary en k8s
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-canary:
+    runs-on: ubuntu-latest
+    env:
+      SERVER_IP: ${{ vars.K3S_SERVER_PUBLIC_IP }}
+      STABLE_IMAGE: mafernandezz/auy1104-app@sha256:8cf9ad3c7a1ae510034a85eaa00107edf167ac785e29165e8f5985581c5c59b4
+      CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
+      #CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:tag-inexistente-v999
+ #Imagen falsa para validar el rollback automatico
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EA2_SSH_PRIVATE_KEY }}
+
+      - name: Render Canary manifests
+        run: |
+          set -e
+          sed "s|STABLE_IMAGE_PLACEHOLDER|${STABLE_IMAGE}|g" \
+            k8s/canary-stable-deployment.yaml \
+            > /tmp/canary-stable-deployment.yaml
+          
+          sed "s|CANARY_IMAGE_PLACEHOLDER|${CANARY_IMAGE}|g" \
+            k8s/canary-deployment.yaml \
+            > /tmp/canary-deployment.yaml
+          
+      - name: Copy Canary manifest to k3s server
+        run: |
+          scp -o StrictHostKeyChecking=accept-new \
+            k8s/canary-namespace.yaml \
+            /tmp/canary-stable-deployment.yaml \
+            /tmp/canary-deployment.yaml \
+            k8s/canary-service.yaml \
+            ubuntu@${SERVER_IP}:/tmp/
+
+      - name: Deploy Canary stack to K3s
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
+          set -e
+          #Implementar manifiestos
+          sudo k3s kubectl apply -f /tmp/canary-namespace.yaml
+          sudo k3s kubectl apply -f /tmp/canary-stable-deployment.yaml
+          sudo k3s kubectl apply -f /tmp/canary-service.yaml
+          sudo k3s kubectl rollout status deployment/orders-api-stable -n canary-orders --timeout=120s
+          sudo k3s kubectl apply -f /tmp/canary-deployment.yaml
+          sudo k3s kubectl rollout status deployment/orders-api-canary -n canary-orders --timeout=120s
+          
+          
+          #Validar funcionamiento
+          sudo k3s kubectl get deployments -n canary-orders
+          sudo k3s kubectl get pods -n canary-orders --show-labels
+          sudo k3s kubectl get svc -n canary-orders
+          EOF
+
+      - name: Verify Stable public endpoint
+        run: |
+          curl -f http://${SERVER_IP}:30080/health
+      
+      - name: Verify Canary health
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
+          set -e
+          sudo k3s kubectl exec deployment/orders-api-canary \
+            -n canary-orders \
+            -- node --input-type=module -e \
+            "const response = await fetch('http://orders-api-canary-validation:3000/health'); console.log(await response.text()); if (!response.ok) process.exit(1);"
+          EOF
+           
+      - name: Enable Canary traffic
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
+          set -e
+          sudo k3s kubectl patch service orders-api-service \
+            -n canary-orders \
+            --type=json \
+            -p='[{"op":"remove","path":"/spec/selector/track"}]'
+          sudo k3s kubectl get endpointslices \
+            -n canary-orders \
+            -l kubernetes.io/service-name=orders-api-service \
+            -o wide
+          EOF
+        
+      - name: Validate Canary traffic
+        run: |
+          set -e
+          for request in {1..20}; do
+            curl -fsS http://${SERVER_IP}:30080/health > /dev/null
+          done
+      
+      - name: Promote Canary to Stable
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+            ubuntu@${SERVER_IP} \
+            "CANARY_IMAGE='${CANARY_IMAGE}' bash -s" << 'EOF'
+          set -e
+          sudo k3s kubectl patch service orders-api-service \
+            -n canary-orders \
+            --type=merge \
+            -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
+          sudo k3s kubectl set image deployment/orders-api-stable \
+            orders-api="${CANARY_IMAGE}" \
+            -n canary-orders
+          sudo k3s kubectl rollout status deployment/orders-api-stable \
+            -n canary-orders \
+            --timeout=120s
+          sudo k3s kubectl delete deployment orders-api-canary \
+            -n canary-orders
+          sudo k3s kubectl get pods \
+            -n canary-orders \
+            -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[0].image,TRACK:.metadata.labels.track'
+          EOF
+      
+      - name: Rollback Canary
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+            ubuntu@${SERVER_IP} \
+            "STABLE_IMAGE='${STABLE_IMAGE}' bash -s" << 'EOF'
+          set -e
+          sudo k3s kubectl patch service orders-api-service \
+            -n canary-orders \
+            --type=merge \
+            -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
+          sudo k3s kubectl set image deployment/orders-api-stable \
+            orders-api="${STABLE_IMAGE}" \
+            -n canary-orders
+          sudo k3s kubectl rollout status deployment/orders-api-stable \
+            -n canary-orders \
+            --timeout=120s
+          sudo k3s kubectl delete deployment orders-api-canary \
+            -n canary-orders \
+            --ignore-not-found=true
+          sudo k3s kubectl get pods \
+            -n canary-orders \
+            --show-labels
+          EOF
