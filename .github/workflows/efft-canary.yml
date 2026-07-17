@@ -75,10 +75,11 @@ jobs:
           #Implementar manifiestos
           sudo k3s kubectl apply -f /tmp/canary-namespace.yaml
           sudo k3s kubectl apply -f /tmp/canary-stable-deployment.yaml
+          sudo k3s kubectl apply -f /tmp/canary-service.yaml
           sudo k3s kubectl rollout status deployment/orders-api-stable -n canary-orders --timeout=120s
           sudo k3s kubectl apply -f /tmp/canary-deployment.yaml
           sudo k3s kubectl rollout status deployment/orders-api-canary -n canary-orders --timeout=120s
-          sudo k3s kubectl apply -f /tmp/canary-service.yaml
+          
           
           #Validar funcionamiento
           sudo k3s kubectl get deployments -n canary-orders
@@ -86,7 +87,16 @@ jobs:
           sudo k3s kubectl get svc -n canary-orders
           EOF
 
-      - name: Verify /health endpoint
+      - name: Verify Stable public endpoint
         run: |
-          sleep 30
           curl -f http://${SERVER_IP}:30080/health
+      
+      - name: Verify Canary health
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} << 'EOF'
+          set -e
+          sudo k3s kubectl exec deployment/orders-api-canary \
+            -n canary-orders \
+            -- node --input-type=module -e \
+            "const response = await fetch('http://orders-api-canary-validation:3000/health'); console.log(await response.text()); if (!response.ok) process.exit(1);"
+          EOF
