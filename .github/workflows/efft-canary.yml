@@ -122,50 +122,50 @@ jobs:
             curl -fsS http://${SERVER_IP}:30080/health > /dev/null
           done
       
-          - name: Promote Canary to Stable
-          run: |
-            ssh -o StrictHostKeyChecking=accept-new \
-              ubuntu@${SERVER_IP} \
-              "CANARY_IMAGE='${CANARY_IMAGE}' bash -s" << 'EOF'
-            set -e
-            sudo k3s kubectl patch service orders-api-service \
-              -n canary-orders \
-              --type=merge \
-              -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
-            sudo k3s kubectl set image deployment/orders-api-stable \
-              orders-api="${CANARY_IMAGE}" \
-              -n canary-orders
-            sudo k3s kubectl rollout status deployment/orders-api-stable \
-              -n canary-orders \
-              --timeout=120s
-            sudo k3s kubectl delete deployment orders-api-canary \
-              -n canary-orders
-            sudo k3s kubectl get pods \
-              -n canary-orders \
-              -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[0].image,TRACK:.metadata.labels.track'
-            EOF
+      - name: Promote Canary to Stable
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+            ubuntu@${SERVER_IP} \
+            "CANARY_IMAGE='${CANARY_IMAGE}' bash -s" << 'EOF'
+          set -e
+          sudo k3s kubectl patch service orders-api-service \
+            -n canary-orders \
+            --type=merge \
+            -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
+          sudo k3s kubectl set image deployment/orders-api-stable \
+            orders-api="${CANARY_IMAGE}" \
+            -n canary-orders
+          sudo k3s kubectl rollout status deployment/orders-api-stable \
+            -n canary-orders \
+            --timeout=120s
+          sudo k3s kubectl delete deployment orders-api-canary \
+            -n canary-orders
+          sudo k3s kubectl get pods \
+            -n canary-orders \
+            -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[0].image,TRACK:.metadata.labels.track'
+          EOF
       
-            - name: Rollback Canary
-            if: failure()
-            run: |
-              ssh -o StrictHostKeyChecking=accept-new \
-                ubuntu@${SERVER_IP} \
-                "STABLE_IMAGE='${STABLE_IMAGE}' bash -s" << 'EOF'
-              set -e
-              sudo k3s kubectl patch service orders-api-service \
-                -n canary-orders \
-                --type=merge \
-                -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
-              sudo k3s kubectl set image deployment/orders-api-stable \
-                orders-api="${STABLE_IMAGE}" \
-                -n canary-orders
-              sudo k3s kubectl rollout status deployment/orders-api-stable \
-                -n canary-orders \
-                --timeout=120s
-              sudo k3s kubectl delete deployment orders-api-canary \
-                -n canary-orders \
-                --ignore-not-found=true
-              sudo k3s kubectl get pods \
-                -n canary-orders \
-                --show-labels
-              EOF
+      - name: Rollback Canary
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+            ubuntu@${SERVER_IP} \
+            "STABLE_IMAGE='${STABLE_IMAGE}' bash -s" << 'EOF'
+          set -e
+          sudo k3s kubectl patch service orders-api-service \
+            -n canary-orders \
+            --type=merge \
+            -p='{"spec":{"selector":{"app":"orders-api","track":"stable"}}}'
+          sudo k3s kubectl set image deployment/orders-api-stable \
+            orders-api="${STABLE_IMAGE}" \
+            -n canary-orders
+          sudo k3s kubectl rollout status deployment/orders-api-stable \
+            -n canary-orders \
+            --timeout=120s
+          sudo k3s kubectl delete deployment orders-api-canary \
+            -n canary-orders \
+            --ignore-not-found=true
+          sudo k3s kubectl get pods \
+            -n canary-orders \
+            --show-labels
+          EOF
