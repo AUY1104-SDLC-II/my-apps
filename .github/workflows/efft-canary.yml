@@ -75,7 +75,9 @@ jobs:
           #Implementar manifiestos
           sudo k3s kubectl apply -f /tmp/canary-namespace.yaml
           sudo k3s kubectl apply -f /tmp/canary-stable-deployment.yaml
+          sudo k3s kubectl rollout status deployment/orders-api-stable -n canary-orders --timeout=120s
           sudo k3s kubectl apply -f /tmp/canary-deployment.yaml
+          sudo k3s kubectl rollout status deployment/orders-api-canary -n canary-orders --timeout=120s
           sudo k3s kubectl apply -f /tmp/canary-service.yaml
           
           #Validar funcionamiento
