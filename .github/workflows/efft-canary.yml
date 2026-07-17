@@ -38,7 +38,9 @@ jobs:
     env:
       SERVER_IP: ${{ vars.K3S_SERVER_PUBLIC_IP }}
       STABLE_IMAGE: mafernandezz/auy1104-app@sha256:8cf9ad3c7a1ae510034a85eaa00107edf167ac785e29165e8f5985581c5c59b4
-      CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
+      #CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
+      CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:tag-inexistente-v999
+ #Imagen falsa para validar el rollback automatico
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
