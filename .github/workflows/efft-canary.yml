@@ -30,7 +30,6 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/auy1104-app:latest
             ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
 
   deploy-canary:
@@ -38,6 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SERVER_IP: ${{ vars.K3S_SERVER_PUBLIC_IP }}
+      STABLE_IMAGE: mafernandezz/auy1104-app@sha256:8cf9ad3c7a1ae510034a85eaa00107edf167ac785e29165e8f5985581c5c59b4
+      CANARY_IMAGE: ${{ secrets.DOCKER_USERNAME }}/auy1104-app:${{ github.sha }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -47,12 +48,23 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EA2_SSH_PRIVATE_KEY }}
 
+      - name: Render Canary manifests
+        run: |
+          set -e
+          sed "s|STABLE_IMAGE_PLACEHOLDER|${STABLE_IMAGE}|g" \
+            k8s/canary-stable-deployment.yaml \
+            > /tmp/canary-stable-deployment.yaml
+          
+          sed "s|CANARY_IMAGE_PLACEHOLDER|${CANARY_IMAGE}|g" \
+            k8s/canary-deployment.yaml \
+            > /tmp/canary-deployment.yaml
+          
       - name: Copy Canary manifest to k3s server
         run: |
           scp -o StrictHostKeyChecking=accept-new \
             k8s/canary-namespace.yaml \
-            k8s/canary-stable-deployment.yaml \
-            k8s/canary-deployment.yaml \
+            /tmp/canary-stable-deployment.yaml \
+            /tmp/canary-deployment.yaml \
             k8s/canary-service.yaml \
             ubuntu@${SERVER_IP}:/tmp/
 
@@ -75,4 +87,4 @@ jobs:
       - name: Verify /health endpoint
         run: |
           sleep 10
-          curl -f http://localhost:30080/
+          curl -f http://localhost:30080/health
