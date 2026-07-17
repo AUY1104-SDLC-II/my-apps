@@ -12,12 +12,14 @@ concurrency:
 
 jobs:
   build:
-    uses: AUY1104-SDLC-II/devops-library/.github/workflows/eft-docker-deploy.yaml@v.2.0.0
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/eft-docker-deploy.yaml@v2.0.1
+    with:
+      image_name: auy1104-app
     secrets: inherit
 
   deploy:
     needs: build
-    uses: AUY1104-SDLC-II/devops-library/.github/workflows/eft-canary-deploy.yaml@v.2.0.0
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/eft-canary-deploy.yaml@v2.0.1
     with:
       stable_image: mafernandezz/auy1104-app@sha256:772c641d4f271816e04da943c8129dca9d19c36b43973e6554db028fcb8e898c
       server_ip: ${{ vars.K3S_SERVER_PUBLIC_IP }}
