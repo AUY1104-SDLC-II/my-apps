@@ -2,6 +2,11 @@ name: EFT - Deploy and Push Docker
 
 on:
   workflow_dispatch:
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
 
 jobs:
   build-and-push:
