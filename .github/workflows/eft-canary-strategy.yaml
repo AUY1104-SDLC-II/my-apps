@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   build:
-    uses: AUY1104-SDLC-II/devops-library/.github/workflows/docker-deploy.yml@main
+    uses: AUY1104-SDLC-II/devops-library/.github/workflows/docker-deploy.yaml@main
     secrets: inherit
 
   deploy:
